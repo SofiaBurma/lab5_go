@@ -6,10 +6,16 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
 	CreateStudents(ctx context.Context, arg CreateStudentsParams) (Student, error)
+	DeleteStudent(ctx context.Context, id uuid.UUID) error
+	GetStudentByID(ctx context.Context, id uuid.UUID) (Student, error)
+	ListStudents(ctx context.Context, arg ListStudentsParams) ([]Student, error)
+	UpdateStudent(ctx context.Context, arg UpdateStudentParams) (Student, error)
 }
 
 var _ Querier = (*Queries)(nil)

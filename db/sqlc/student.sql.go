@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createStudents = `-- name: CreateStudents :one
@@ -25,6 +27,104 @@ type CreateStudentsParams struct {
 
 func (q *Queries) CreateStudents(ctx context.Context, arg CreateStudentsParams) (Student, error) {
 	row := q.db.QueryRow(ctx, createStudents, arg.FullName, arg.Age, arg.GroupName)
+	var i Student
+	err := row.Scan(
+		&i.ID,
+		&i.FullName,
+		&i.Age,
+		&i.GroupName,
+	)
+	return i, err
+}
+
+const deleteStudent = `-- name: DeleteStudent :exec
+DELETE FROM students
+WHERE id = $1
+`
+
+func (q *Queries) DeleteStudent(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteStudent, id)
+	return err
+}
+
+const getStudentByID = `-- name: GetStudentByID :one
+SELECT id, full_name, age, group_name
+FROM students
+WHERE id = $1
+`
+
+func (q *Queries) GetStudentByID(ctx context.Context, id uuid.UUID) (Student, error) {
+	row := q.db.QueryRow(ctx, getStudentByID, id)
+	var i Student
+	err := row.Scan(
+		&i.ID,
+		&i.FullName,
+		&i.Age,
+		&i.GroupName,
+	)
+	return i, err
+}
+
+const listStudents = `-- name: ListStudents :many
+SELECT id, full_name, age, group_name
+FROM students
+ORDER BY id
+LIMIT $1 OFFSET $2
+`
+
+type ListStudentsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListStudents(ctx context.Context, arg ListStudentsParams) ([]Student, error) {
+	rows, err := q.db.Query(ctx, listStudents, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Student{}
+	for rows.Next() {
+		var i Student
+		if err := rows.Scan(
+			&i.ID,
+			&i.FullName,
+			&i.Age,
+			&i.GroupName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateStudent = `-- name: UpdateStudent :one
+UPDATE students
+SET full_name = $2,
+    age = $3,
+    group_name = $4
+WHERE id = $1
+RETURNING id, full_name, age, group_name
+`
+
+type UpdateStudentParams struct {
+	ID        uuid.UUID `json:"id"`
+	FullName  string    `json:"full_name"`
+	Age       int32     `json:"age"`
+	GroupName string    `json:"group_name"`
+}
+
+func (q *Queries) UpdateStudent(ctx context.Context, arg UpdateStudentParams) (Student, error) {
+	row := q.db.QueryRow(ctx, updateStudent,
+		arg.ID,
+		arg.FullName,
+		arg.Age,
+		arg.GroupName,
+	)
 	var i Student
 	err := row.Scan(
 		&i.ID,
